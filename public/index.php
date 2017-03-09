@@ -1,63 +1,32 @@
 <?php
 
-use Phalcon\Loader;
-use Phalcon\Tag;
-use Phalcon\Mvc\Url;
-use Phalcon\Mvc\View;
+error_reporting(E_ALL);
+
 use Phalcon\Mvc\Application;
-use Phalcon\DI\FactoryDefault;
-use Phalcon\Db\Adapter\Pdo\Mysql as DbAdapter;
+use Phalcon\Config\Adapter\Ini as ConfigIni;
 
 try {
+    define('APP_PATH', realpath('..') . '/');
 
-	// Register an autoloader
-	$loader = new Loader();
-	$loader->registerDirs(
-		array(
-			'../app/controllers/',
-			'../app/models/'
-		)
-	)->register();
+    /**
+     * Read the configuration
+     */
+    $config = new ConfigIni(APP_PATH . 'app/config/config.ini');
+    if (is_readable(APP_PATH . 'app/config/config.ini.dev')) {
+        $override = new ConfigIni(APP_PATH . 'app/config/config.ini.dev');
+        $config->merge($override);
+    }
 
-	// Create a DI
-	$di = new FactoryDefault();
+    /**
+     * Auto-loader configuration
+     */
+    require APP_PATH . 'app/config/loader.php';
 
-	// Settup the database service
-	$di['db'] = function(){
-		return new DbAdapter(
-			[
-				"host" => "localhost",
-				"username" => "root",
-				"password" => "",
-				"dbname" => "phalcon",
-			]
-		);
-	};
+    $application = new Application(new Services($config));
 
-	// Setting up the view component
-	$di['view'] = function() {
-		$view = new View();
-		$view->setViewsDir('../app/views/');
-		return $view;
-	};
-
-	// Setup a base URI so that all generated URIs include the "tutorial" folder
-	$di['url'] = function() {
-		$url = new Url();
-		$url->setBaseUri('/phalcon/');
-		return $url;
-	};
-
-	// Setup the tag helpers
-	$di['tag'] = function() {
-		return new Tag();
-	};
-
-	// Handle the request
-	$application = new Application($di);
-
-	echo $application->handle()->getContent();
-
-} catch (Exception $e) {
-	 echo "Exception: ", $e->getMessage();
+    // NGINX - PHP-FPM already set PATH_INFO variable to handle route
+    echo $application->handle(!empty($_SERVER['PATH_INFO']) ? $_SERVER['PATH_INFO'] : null)->getContent();
+} catch (Exception $e){
+    echo $e->getMessage() . '<br>';
+    echo '<pre>' . $e->getTraceAsString() . '</pre>';
 }
